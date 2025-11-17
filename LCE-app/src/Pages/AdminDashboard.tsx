@@ -1027,11 +1027,15 @@ function StartupsView({
   const [error, setError] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState("pending");
 
-  React.useEffect(() => {
-    fetchStartups();
-  }, []);
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  };
 
-  const fetchStartups = async () => {
+  const fetchStartups = React.useCallback(async () => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/startups`,
@@ -1040,6 +1044,12 @@ function StartupsView({
         }
       );
       if (!response.ok) {
+        if (response.status === 401) {
+          console.error("StartupsView - Unauthorized. User needs to login.");
+          setError("Authentication failed. Please log in again.");
+          // Optionally redirect to login
+          return;
+        }
         throw new Error("Failed to fetch startups");
       }
       const responseData = await response.json();
@@ -1051,7 +1061,11 @@ function StartupsView({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  React.useEffect(() => {
+    fetchStartups();
+  }, [fetchStartups]);
 
   const handleApprove = async (startupId: string) => {
     try {
@@ -1120,7 +1134,22 @@ function StartupsView({
           <p>Loading startups...</p>
         </div>
       ) : error ? (
-        <div className="text-center text-red-500">{error}</div>
+        <div className="text-center py-8">
+          <div className="text-red-500 mb-4">{error}</div>
+          {error.includes("Authentication failed") && (
+            <div>
+              <p className="mb-2">Please log in with admin credentials:</p>
+              <p className="text-sm text-gray-600">Email: admin@atlas.com</p>
+              <p className="text-sm text-gray-600">Password: atlasadmin123</p>
+              <Button 
+                className="mt-3" 
+                onClick={() => window.location.href = '/login'}
+              >
+                Go to Login
+              </Button>
+            </div>
+          )}
+        </div>
       ) : (
         <Card>
           <Table>
